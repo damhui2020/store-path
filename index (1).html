@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>STORE PATH · 매장 길안내 프로토타입</title>
+<style>
+:root{
+  --bg:#faf7f5; --surface:#ffffff; --text:#1f1b1c; --muted:#7a7173; --line:#e8e1de;
+  --floor:#f4efec; --shelf:#ddd3ce; --shelf-text:#5b5153; --cashier:#c9bfba;
+  --accent:#ff4f9a; --chip:#f1ebe8; --me:#ff4f9a;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141112; --surface:#1e1a1b; --text:#f3eeee; --muted:#a0969a; --line:#342e30;
+    --floor:#181415; --shelf:#3b3335; --shelf-text:#d2c8cb; --cashier:#52484b; --chip:#2a2426;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141112; --surface:#1e1a1b; --text:#f3eeee; --muted:#a0969a; --line:#342e30;
+  --floor:#181415; --shelf:#3b3335; --shelf-text:#d2c8cb; --cashier:#52484b; --chip:#2a2426;
+  color-scheme: dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;line-height:1.5;-webkit-tap-highlight-color:transparent}
+.app{max-width:440px;margin:0 auto;padding:18px 16px 40px}
+.eyebrow{font-size:11px;letter-spacing:.12em;color:var(--accent);font-weight:700}
+h1{font-size:21px;line-height:1.3;margin:6px 0 6px;letter-spacing:-.02em}
+.sub{margin:0 0 14px;font-size:13px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px}
+.searchbox{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:0 12px}
+.searchbox input{flex:1;border:0;outline:0;background:transparent;color:var(--text);font-size:16px;padding:12px 0;font-family:inherit;min-width:0}
+.searchbox:focus-within{border-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{border:0;background:var(--chip);color:var(--text);font-size:13px;padding:7px 11px;border-radius:999px;cursor:pointer;font-family:inherit}
+.chip small{color:var(--muted);margin-left:4px}
+.chip:active{transform:scale(.97)}
+.hint{font-size:12px;color:var(--muted);margin:12px 0 0}
+.targets{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.t{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:14px;background:var(--surface);border:1.5px solid var(--line);cursor:pointer}
+.t.active{border-color:var(--c)}
+.dot{width:24px;height:24px;border-radius:50%;background:var(--c);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
+.t .name{font-size:14px;font-weight:600}
+.t .meta{font-size:12px;color:var(--muted)}
+.t .grow{flex:1;min-width:0}
+.t .x{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 6px}
+.badge{font-size:11px;font-weight:700;color:#fff;background:#16a34a;border-radius:999px;padding:2px 8px;margin-left:6px}
+.now{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.now .big{font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+.now .small{font-size:12px;color:var(--muted)}
+.now .dotc{width:14px;height:14px;border-radius:50%;background:var(--c,var(--accent));flex:none}
+.now .rest{margin-left:auto;text-align:right;font-size:12px;color:var(--muted);white-space:nowrap}
+.mapwrap{padding:6px}
+svg{display:block;width:100%;height:auto;touch-action:manipulation;border-radius:11px}
+.floor{fill:var(--floor)}
+.shelf{fill:var(--shelf)}
+.cashier{fill:var(--cashier)}
+.lbl{fill:var(--shelf-text);font-size:9px;font-weight:600;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.entr{fill:var(--muted);font-size:10px;font-weight:700;text-anchor:middle}
+.flow{animation:flow 1.1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-14}}
+.pulse{animation:pulse 1.8s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pulse{0%{transform:scale(.5);opacity:.55}100%{transform:scale(1.7);opacity:0}}
+
+/* character */
+#me .f-front,#me .f-side,#me .f-back{display:none}
+#me[data-face="down"] .f-front{display:inline}
+#me[data-face="left"] .f-side,#me[data-face="right"] .f-side{display:inline}
+#me[data-face="up"] .f-back{display:inline}
+#me .bodyc{fill:var(--me)}
+#me .legL,#me .legR,#me .armL,#me .armR{transform-box:fill-box;transform-origin:50% 5%}
+#me[data-walk="1"] .legL,#me[data-walk="1"] .armR{animation:swingA .3s ease-in-out infinite alternate}
+#me[data-walk="1"] .legR,#me[data-walk="1"] .armL{animation:swingB .3s ease-in-out infinite alternate}
+#me[data-walk="1"] .bob{animation:bob .3s ease-in-out infinite alternate}
+@keyframes swingA{from{transform:rotate(-30deg)}to{transform:rotate(30deg)}}
+@keyframes swingB{from{transform:rotate(30deg)}to{transform:rotate(-30deg)}}
+@keyframes bob{from{transform:translateY(0)}to{transform:translateY(-1.8px)}}
+#me .bubble{animation:pop .35s cubic-bezier(.2,1.6,.4,1) both;transform-box:fill-box;transform-origin:50% 100%}
+@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion: reduce){.flow,.pulse,#me *{animation:none!important}}
+
+.row{display:flex;gap:8px;margin-top:8px}
+.btn{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--text);padding:11px 8px;border-radius:12px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.btn:disabled{opacity:.45;cursor:default}
+.status{font-size:12px;color:var(--muted);margin-top:8px;min-height:18px}
+.status.ok{color:#16a34a}
+.status.warn{color:#d97706}
+.steps{margin-top:12px}
+.steps h2{font-size:14px;margin:0 0 8px}
+.steps ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.steps li{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+.steps .n{width:20px;height:20px;border-radius:50%;background:var(--chip);font-size:11px;display:grid;place-items:center;flex:none;margin-top:1px;color:var(--muted);font-weight:700}
+details{margin-top:12px}
+summary{cursor:pointer;font-size:13px;font-weight:600}
+pre{margin:10px 0 0;font-size:11.5px;overflow-x:auto;background:var(--chip);padding:10px;border-radius:10px;line-height:1.5}
+.note{font-size:12px;color:var(--muted);margin-top:14px}
+.empty{font-size:13px;color:var(--muted);padding:4px 2px}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="eyebrow">STORE PATH · 프로토타입 v0.3</div>
+  <h1>찾는 물건까지, 색 선 하나로</h1>
+  <p class="sub">가상의 대형 생활용품점 · 샘플 제품 <span id="pcount"></span>개 · 지도를 탭하면 캐릭터가 걸어가요</p>
+
+  <div class="searchbox">
+    <span aria-hidden="true">🔍</span>
+    <input id="q" type="search" placeholder="찾는 제품 (예: 칫솔, 볼펜)" autocomplete="off">
+  </div>
+  <div class="hint" id="hint">자주 찾는 제품</div>
+  <div class="chips" id="results"></div>
+
+  <div class="targets" id="targets"></div>
+
+  <div class="card now" id="now"></div>
+
+  <div class="card mapwrap">
+    <svg id="map" viewBox="0 0 400 560" role="img" aria-label="가상 매장 평면도">
+      <rect class="floor" x="0" y="0" width="400" height="560" rx="8"/>
+      <g id="static"></g>
+      <g id="dyn"></g>
+      <g id="me" data-face="up" data-walk="0">
+        <circle class="pulse" cx="0" cy="0" r="11" style="fill:var(--me)"/>
+        <ellipse cx="0" cy="0.5" rx="8" ry="2.6" fill="#000" opacity=".2"/>
+        <g id="flip">
+          <g class="bob">
+            <rect class="legL" x="-4.6" y="-8.5" width="3.3" height="8.5" rx="1.6" fill="#3d3a55"/>
+            <rect class="legR" x="1.3" y="-8.5" width="3.3" height="8.5" rx="1.6" fill="#3d3a55"/>
+            <rect class="armL bodyc" x="-9.6" y="-18" width="3.4" height="9" rx="1.7"/>
+            <rect class="armR bodyc" x="6.2" y="-18" width="3.4" height="9" rx="1.7"/>
+            <rect class="bodyc" x="-6.6" y="-19" width="13.2" height="12" rx="5"/>
+            <circle cx="0" cy="-26" r="8.2" fill="#ffd9bf"/>
+            <g class="f-front">
+              <path d="M-8.4 -27 A8.4 8.4 0 0 1 8.4 -27 Q4.5 -30.5 0 -28.2 Q-4.5 -30.5 -8.4 -27 Z" fill="#3a2c2a"/>
+              <circle cx="-3" cy="-25.6" r="1.15" fill="#2b2220"/>
+              <circle cx="3" cy="-25.6" r="1.15" fill="#2b2220"/>
+              <ellipse cx="-5.4" cy="-23" rx="1.7" ry="1.05" fill="#ff8fb3" opacity=".65"/>
+              <ellipse cx="5.4" cy="-23" rx="1.7" ry="1.05" fill="#ff8fb3" opacity=".65"/>
+              <path d="M-1.8 -22.4 Q0 -20.8 1.8 -22.4" fill="none" stroke="#2b2220" stroke-width="1" stroke-linecap="round"/>
+            </g>
+            <g class="f-side">
+              <circle cx="0" cy="-26" r="8.4" fill="#3a2c2a"/>
+              <ellipse cx="2.6" cy="-25.2" rx="5.8" ry="6.3" fill="#ffd9bf"/>
+              <circle cx="4.7" cy="-25.8" r="1.15" fill="#2b2220"/>
+              <ellipse cx="5.6" cy="-23.2" rx="1.6" ry="1" fill="#ff8fb3" opacity=".65"/>
+              <path d="M3.4 -22.2 Q4.8 -21 6.2 -22.4" fill="none" stroke="#2b2220" stroke-width="1" stroke-linecap="round"/>
+            </g>
+            <g class="f-back">
+              <circle cx="0" cy="-26" r="8.4" fill="#3a2c2a"/>
+              <path d="M-4 -30 Q0 -32 4 -30" fill="none" stroke="#5a4642" stroke-width="1.2" stroke-linecap="round"/>
+            </g>
+          </g>
+        </g>
+        <g id="bubble" class="bubble" style="display:none">
+          <path d="M-24 -56 h48 a8 8 0 0 1 8 8 v6 a8 8 0 0 1 -8 8 h-17 l-4 5 l-4 -5 h-23 a8 8 0 0 1 -8 -8 v-6 a8 8 0 0 1 8 -8 z" transform="translate(0 2)" fill="#fff" stroke="#e0d6d1"/>
+          <text x="0" y="-42" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1f1b1c">찾았다!</text>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div class="row">
+    <button class="btn" id="stepBtn">👟 걸음으로 따라가기</button>
+    <button class="btn" id="gpsBtn">📍 GPS로 따라가기</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="followBtn">🗺 전체 보기</button>
+    <button class="btn" id="reset">입구로 돌아가기</button>
+  </div>
+  <div class="row">
+    <button class="btn primary" id="walk">▶ 걸어가 보기</button>
+    <button class="btn" id="senseBtn" style="display:none">민감도: 보통</button>
+  </div>
+  <div class="status" id="gpsstatus">추천: 👟 걸음 모드. 폰이 걸음과 방향을 직접 감지해서 GPS보다 훨씬 빨리 반응해요. 센서 값은 이 화면 안에서만 쓰이고 저장·전송되지 않아요.</div>
+
+  <section class="steps card" id="steps"></section>
+
+  <details class="card">
+    <summary>이 앱이 필요로 하는 데이터는?</summary>
+    <pre id="datasample"></pre>
+    <p class="note" style="margin-top:8px">제품 → 매대 연결과 매장 평면도만 있으면 길은 자동으로 계산돼요.</p>
+  </details>
+
+  <p class="note">※ 매장·제품 위치는 모두 임의로 만든 가상 데이터예요. 👟 걸음 모드: 매장 안쪽(지도 위쪽)을 바라보고 시작하면 한 걸음이 한 칸(약 0.7m)으로 움직이고, 방향은 폰 나침반을 따라요. 폰은 가슴 높이에서 앞쪽으로 살짝 세워 들어 주세요. 📍 GPS 모드는 신호 오차(수 m)와 1초 간격 갱신 때문에 이 크기의 매장에서는 둔하게 느껴질 수 있어요.</p>
+</main>
+
+<script>
+(function(){
+  var COLS=20, ROWS=28, C=20, TURN=4, VW=400, VH=560;
+  var COLORS=['#ff4f9a','#3b82f6','#f59e0b'];
+  var DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
+
+  var shelves=[
+    {id:'kitchen1',name:'주방용품',x:4,y:4,w:2,h:7},
+    {id:'kitchen2',name:'식기·조리',x:4,y:13,w:2,h:6},
+    {id:'clean1',name:'청소용품',x:8,y:4,w:2,h:7},
+    {id:'laundry',name:'세탁용품',x:8,y:13,w:2,h:6},
+    {id:'bath1',name:'욕실용품',x:12,y:4,w:2,h:7},
+    {id:'bath2',name:'욕실·슬리퍼',x:12,y:13,w:2,h:6},
+    {id:'beauty',name:'뷰티·위생',x:15,y:4,w:2,h:7},
+    {id:'interior',name:'인테리어',x:15,y:13,w:2,h:6},
+    {id:'leftwall',name:'수납·정리',x:1,y:2,w:1,h:18},
+    {id:'rightwall',name:'시즌·파티',x:18,y:2,w:1,h:18},
+    {id:'stationery',name:'문구',x:3,y:1,w:5,h:1},
+    {id:'toys',name:'완구',x:8,y:1,w:5,h:1},
+    {id:'pet',name:'반려동물',x:13,y:1,w:5,h:1},
+    {id:'digital',name:'디지털',x:4,y:21,w:5,h:1},
+    {id:'snack',name:'식품·간식',x:11,y:21,w:5,h:1},
+    {id:'cashier',name:'계산대',x:1,y:24,w:5,h:2,cashier:true}
+  ];
+  var shelfById={}; shelves.forEach(function(s){shelfById[s.id]=s;});
+
+  var products=[
+    ['스테인리스 빨대 세척솔','kitchen1'],['실리콘 주걱','kitchen1'],
+    ['밀폐 용기 세트','kitchen2'],['머그컵','kitchen2'],
+    ['청소용 솔','clean1'],['고무장갑','clean1'],
+    ['빨래집게','laundry'],['세탁망','laundry'],
+    ['칫솔','bath1'],['샤워볼','bath1'],
+    ['욕실 슬리퍼','bath2'],['비누받침','bath2'],
+    ['핸드크림','beauty'],['화장솜','beauty'],
+    ['LED 무드등','interior'],['미니 액자','interior'],
+    ['수납 바구니','leftwall'],['리빙박스','leftwall'],
+    ['크리스마스 장식','rightwall'],['파티 풍선','rightwall'],
+    ['볼펜','stationery'],['스티커','stationery'],['노트','stationery'],
+    ['직소 퍼즐','toys'],['반려견 간식','pet'],
+    ['충전 케이블','digital'],['유선 이어폰','digital'],
+    ['젤리','snack'],['과자','snack']
+  ].map(function(p){return {name:p[0],shelf:p[1]};});
+
+  var blocked={};
+  shelves.forEach(function(s){for(var i=0;i<s.w;i++)for(var j=0;j<s.h;j++)blocked[(s.x+i)+','+(s.y+j)]=1;});
+  function inb(x,y){return x>=0&&y>=0&&x<COLS&&y<ROWS;}
+  function walk(x,y){return inb(x,y)&&!blocked[x+','+y];}
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+
+  var ENTRANCE={x:9,y:27};
+  var state={pos:{x:ENTRANCE.x,y:ENTRANCE.y},targets:[],active:0,follow:false,queue:[],mode:'demo'};
+  var disp={x:ENTRANCE.x+.5,y:ENTRANCE.y+.5}, goal={x:ENTRANCE.x+.5,y:ENTRANCE.y+.5};
+  var walking=false, face='up', bubbleOn=false, camera={x:VW/2,y:VH/2,w:VW};
+
+  var $=function(id){return document.getElementById(id);};
+  var svg=$('map'), me=$('me');
+
+  /* ---------- pathfinding: Dijkstra with turn penalty ---------- */
+  function search(sx,sy){
+    var N=COLS*ROWS*5;
+    var dist=new Int32Array(N).fill(1e9), prev=new Int32Array(N).fill(-1);
+    var buckets=[[]], start=(sy*COLS+sx)*5+4;
+    dist[start]=0; buckets[0].push(start);
+    for(var c=0;c<buckets.length;c++){
+      var b=buckets[c]; if(!b) continue;
+      for(var bi=0;bi<b.length;bi++){
+        var s=b[bi]; if(dist[s]!==c) continue;
+        var cell=(s/5)|0, d=s%5, x=cell%COLS, y=(cell/COLS)|0;
+        for(var nd=0;nd<4;nd++){
+          var nx=x+DIRS[nd][0], ny=y+DIRS[nd][1];
+          if(!walk(nx,ny)) continue;
+          var cost=1+((d!==4&&d!==nd)?TURN:0), ns=(ny*COLS+nx)*5+nd, nc=c+cost;
+          if(nc<dist[ns]){dist[ns]=nc;prev[ns]=s;(buckets[nc]||(buckets[nc]=[])).push(ns);}
+        }
+      }
+    }
+    return {dist:dist,prev:prev};
+  }
+  function reconstruct(res,best){
+    var path=[],cur=best;
+    while(cur!==-1){var cell=(cur/5)|0;path.push([cell%COLS,(cell/COLS)|0]);cur=res.prev[cur];}
+    return path.reverse();
+  }
+  function bestState(res,x,y){
+    var base=(y*COLS+x)*5,best=-1,bd=1e9;
+    for(var d=0;d<5;d++){var v=res.dist[base+d]; if(v<bd){bd=v;best=base+d;}}
+    return {best:best,d:bd};
+  }
+  function adjCells(sh){
+    var m={},out=[];
+    for(var i=0;i<sh.w;i++)for(var j=0;j<sh.h;j++)for(var k=0;k<4;k++){
+      var nx=sh.x+i+DIRS[k][0], ny=sh.y+j+DIRS[k][1];
+      if(walk(nx,ny)&&!m[nx+','+ny]){m[nx+','+ny]=1;out.push([nx,ny]);}
+    }
+    return out;
+  }
+  function routeTo(res,sh){
+    var best=-1,bd=1e9;
+    adjCells(sh).forEach(function(c){var r=bestState(res,c[0],c[1]); if(r.d<bd){bd=r.d;best=r.best;}});
+    if(best<0||bd>=1e9) return null;
+    var cells=reconstruct(res,best);
+    return {cells:cells,meters:cells.length-1};
+  }
+  function nearestWalkable(fx,fy){
+    var cx=Math.floor(fx),cy=Math.floor(fy);
+    if(walk(cx,cy)) return [cx,cy];
+    var best=null,bd=1e9;
+    for(var r=1;r<=30&&!best;r++){
+      for(var x=cx-r;x<=cx+r;x++)for(var y=cy-r;y<=cy+r;y++){
+        if(!walk(x,y)) continue;
+        var d=Math.hypot(x+.5-fx,y+.5-fy);
+        if(d<bd){bd=d;best=[x,y];}
+      }
+    }
+    return best||[ENTRANCE.x,ENTRANCE.y];
+  }
+
+  /* ---------- geometry helpers ---------- */
+  function corners(cells){
+    var pts=[cells[0]], pd=null;
+    for(var i=1;i<cells.length;i++){
+      var d=[cells[i][0]-cells[i-1][0],cells[i][1]-cells[i-1][1]];
+      if(pd&&(d[0]!==pd[0]||d[1]!==pd[1])) pts.push(cells[i-1]);
+      pd=d;
+    }
+    pts.push(cells[cells.length-1]);
+    return pts;
+  }
+  function px(c){return [(c[0]+.5)*C,(c[1]+.5)*C];}
+  function pathD(cells){
+    if(cells.length<2) return '';
+    var p=corners(cells).map(px), d='M'+p[0][0]+' '+p[0][1];
+    for(var i=1;i<p.length;i++){
+      if(i<p.length-1){
+        var a=p[i-1],b=p[i],c=p[i+1];
+        var l1=Math.hypot(b[0]-a[0],b[1]-a[1]), l2=Math.hypot(c[0]-b[0],c[1]-b[1]);
+        var r=Math.min(8,l1/2,l2/2);
+        var u1=[(b[0]-a[0])/l1,(b[1]-a[1])/l1], u2=[(c[0]-b[0])/l2,(c[1]-b[1])/l2];
+        d+=' L'+(b[0]-u1[0]*r)+' '+(b[1]-u1[1]*r)+' Q'+b[0]+' '+b[1]+' '+(b[0]+u2[0]*r)+' '+(b[1]+u2[1]*r);
+      } else d+=' L'+p[i][0]+' '+p[i][1];
+    }
+    return d;
+  }
+  function runsOf(cells){
+    var runs=[];
+    for(var i=1;i<cells.length;i++){
+      var d=[cells[i][0]-cells[i-1][0],cells[i][1]-cells[i-1][1]];
+      var last=runs[runs.length-1];
+      if(last&&last.d[0]===d[0]&&last.d[1]===d[1]) last.n++; else runs.push({d:d,n:1,at:cells[i-1]});
+    }
+    return runs;
+  }
+  function turnWord(p,d){
+    var cross=p[0]*d[1]-p[1]*d[0], dot=p[0]*d[0]+p[1]*d[1];
+    return cross>0?'우회전':cross<0?'좌회전':(dot<0?'뒤로 돌아서':'직진');
+  }
+  function stepTexts(cells,shelf){
+    var runs=runsOf(cells), out=[];
+    runs.forEach(function(r,i){
+      if(i===0) out.push('앞으로 '+r.n+'m 직진');
+      else out.push(turnWord(runs[i-1].d,r.d)+' 후 '+r.n+'m');
+    });
+    out.push('도착: '+shelf.name+' 매대');
+    return out;
+  }
+  function esc(s){return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+  function fmtTime(m){var s=Math.round(m/1.2);return s<60?s+'초':Math.floor(s/60)+'분 '+(s%60)+'초';}
+
+  /* ---------- static layer ---------- */
+  function buildStatic(){
+    var h='';
+    shelves.forEach(function(s){
+      var x=s.x*C,y=s.y*C,w=s.w*C,hh=s.h*C,cx=x+w/2,cy=y+hh/2;
+      h+='<rect class="'+(s.cashier?'cashier':'shelf')+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+hh+'" rx="4"/>';
+      if(hh>w*1.5) h+='<text class="lbl" transform="translate('+cx+' '+cy+') rotate(-90)">'+s.name+'</text>';
+      else h+='<text class="lbl" x="'+cx+'" y="'+cy+'">'+s.name+'</text>';
+    });
+    h+='<text class="entr" x="'+((ENTRANCE.x+.5)*C)+'" y="'+(ROWS*C-2)+'">▲ 입구</text>';
+    $('static').innerHTML=h;
+  }
+
+  /* ---------- routes + view ---------- */
+  function compute(){
+    var res=search(state.pos.x,state.pos.y);
+    state.targets.forEach(function(t){
+      t.route=routeTo(res,shelfById[t.shelf]);
+      t.arrived=!!t.route&&t.route.meters===0;
+    });
+  }
+  function renderDyn(){
+    var phase=((performance.now()/1000)%1.1).toFixed(3);
+    var h='', order=state.targets.map(function(_,i){return i;}).filter(function(i){return i!==state.active;});
+    if(state.targets[state.active]) order.push(state.active);
+    state.targets.forEach(function(t,i){
+      var s=shelfById[t.shelf],col=COLORS[i],a=(i===state.active);
+      h+='<rect x="'+(s.x*C)+'" y="'+(s.y*C)+'" width="'+(s.w*C)+'" height="'+(s.h*C)+'" rx="4" fill="'+col+'" fill-opacity="'+(a?.28:.14)+'" stroke="'+col+'" stroke-width="'+(a?2.5:1.5)+'"/>';
+    });
+    order.forEach(function(i){
+      var t=state.targets[i],col=COLORS[i],act=(i===state.active);
+      if(!t.route||t.route.cells.length<2) return;
+      var d=pathD(t.route.cells),off=i*2;
+      h+='<g transform="translate('+off+' '+off+')" opacity="'+(act?1:.55)+'">';
+      h+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-opacity=".28" stroke-width="'+(act?9:6)+'" stroke-linecap="round" stroke-linejoin="round"/>';
+      h+='<path class="flow" style="animation-delay:-'+phase+'s" d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+(act?3.5:2.5)+'" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 13"/>';
+      if(act){
+        runsOf(t.route.cells).forEach(function(r,ri){
+          if(ri===0) return;
+          var p=px(r.at), ang=Math.atan2(r.d[1],r.d[0])*180/Math.PI;
+          h+='<g transform="translate('+p[0]+' '+p[1]+') rotate('+ang+')"><circle r="7.5" fill="'+col+'"/><path d="M-2.5 -3.5 L3 0 L-2.5 3.5 Z" fill="#fff"/></g>';
+        });
+      }
+      h+='</g>';
+    });
+    state.targets.forEach(function(t,i){
+      var s=shelfById[t.shelf],col=COLORS[i],cx=(s.x+s.w/2)*C,cy=(s.y+s.h/2)*C;
+      if(t.arrived) h+='<circle class="pulse" cx="'+cx+'" cy="'+cy+'" r="16" fill="'+col+'"/>';
+      h+='<circle cx="'+cx+'" cy="'+cy+'" r="10" fill="'+col+'" stroke="#fff" stroke-width="2"/><text x="'+cx+'" y="'+(cy+.5)+'" fill="#fff" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="central">'+(i+1)+'</text>';
+    });
+    $('dyn').innerHTML=h;
+    me.style.setProperty('--me',COLORS[state.active]||COLORS[0]);
+  }
+  function renderPanels(){
+    // targets list
+    var el=$('targets');
+    if(!state.targets.length) el.innerHTML='<div class="empty">제품을 고르면 지도에 색 선이 나타나요. (최대 3개)</div>';
+    else el.innerHTML=state.targets.map(function(t,i){
+      var sh=shelfById[t.shelf];
+      var meta=t.arrived?'도착했어요':(t.route?('걸어서 약 '+fmtTime(t.route.meters)+' · '+t.route.meters+'m'):'경로 없음');
+      return '<div class="t'+(i===state.active?' active':'')+'" style="--c:'+COLORS[i]+'" data-i="'+i+'">'+
+        '<div class="dot">'+(i+1)+'</div>'+
+        '<div class="grow"><div class="name">'+esc(t.name)+(t.arrived?'<span class="badge">도착</span>':'')+'</div>'+
+        '<div class="meta">'+esc(sh.name)+' 매대 · '+meta+'</div></div>'+
+        '<button class="x" data-rm="'+i+'" aria-label="삭제">×</button></div>';
+    }).join('');
+
+    // now bar
+    var a=state.targets[state.active], now=$('now');
+    now.style.setProperty('--c',COLORS[state.active]||COLORS[0]);
+    if(!a||!a.route){now.innerHTML='<div><div class="big">찾을 제품을 골라 보세요</div><div class="small">고르면 캐릭터가 길을 따라 안내해요</div></div>';}
+    else if(a.arrived){now.innerHTML='<span class="dotc"></span><div><div class="big">도착했어요!</div><div class="small">'+esc(shelfById[a.shelf].name)+' 매대에서 「'+esc(a.name)+'」을 찾아보세요</div></div>';}
+    else{
+      var runs=runsOf(a.route.cells), nxt=runs[1]?turnWord(runs[0].d,runs[1].d):null;
+      now.innerHTML='<span class="dotc"></span><div><div class="big">앞으로 '+runs[0].n+'m</div><div class="small">'+(nxt?('그다음 '+nxt):'그다음 도착')+' · 「'+esc(a.name)+'」</div></div><div class="rest">남은 거리<br><b style="color:var(--text);font-size:14px">'+a.route.meters+'m</b></div>';
+    }
+
+    // steps
+    var st=$('steps');
+    if(!a||!a.route||a.arrived){st.style.display='none';}
+    else{
+      st.style.display='block';
+      var steps=stepTexts(a.route.cells,shelfById[a.shelf]);
+      st.innerHTML='<h2>「'+esc(a.name)+'」까지</h2><ol>'+steps.map(function(s,i){return '<li><span class="n">'+(i+1)+'</span><span>'+s+'</span></li>';}).join('')+'</ol>';
+    }
+    $('walk').disabled=!a||a.arrived||state.mode!=='demo';
+  }
+  function render(){compute();renderDyn();renderPanels();}
+
+  /* ---------- search UI ---------- */
+  function norm(s){return s.replace(/\s+/g,'').toLowerCase();}
+  function renderResults(){
+    var q=norm($('q').value), list;
+    if(!q){
+      list=[products[0],products[8],products[20],products[27],products[16],products[25]];
+      $('hint').textContent='자주 찾는 제품';
+    } else {
+      list=products.filter(function(p){return norm(p.name).indexOf(q)>-1||norm(shelfById[p.shelf].name).indexOf(q)>-1;}).slice(0,8);
+      $('hint').textContent=list.length?('검색 결과 '+list.length+'개'):'일치하는 제품이 없어요';
+    }
+    $('results').innerHTML=list.map(function(p){
+      return '<button class="chip" data-p="'+esc(p.name)+'">'+esc(p.name)+'<small>'+esc(shelfById[p.shelf].name)+'</small></button>';
+    }).join('');
+  }
+  function addTarget(name){
+    var p=products.filter(function(x){return x.name===name;})[0]; if(!p) return;
+    state.queue=[];
+    var idx=state.targets.findIndex(function(t){return t.name===name;});
+    if(idx>-1) state.active=idx;
+    else{
+      if(state.targets.length>=3) state.targets.shift();
+      state.targets.push({name:p.name,shelf:p.shelf});
+      state.active=state.targets.length-1;
+    }
+    render();
+  }
+
+  /* ---------- movement (demo mode) ---------- */
+  function walkToCell(x,y){
+    var res=search(state.pos.x,state.pos.y), r=bestState(res,x,y);
+    if(r.best<0||r.d>=1e9) return;
+    state.queue=reconstruct(res,r.best);
+  }
+  function startWalk(){
+    var t=state.targets[state.active];
+    if(!t||!t.route||t.arrived||state.mode!=='demo') return;
+    state.queue=t.route.cells.slice();
+  }
+
+  /* ---------- GPS & step sensors ---------- */
+  var gps={watch:null,anchor:null,last:null,sm:null,t0:0};
+  var sense='normal';
+  var MPC={normal:0.7,high:0.35};     // GPS: meters per cell
+  var THR={normal:11.0,high:10.4};    // steps: acceleration threshold
+  var sens={steps:0,h0:null,heading:null,ls:0,s:9.8,prev:9.8,pos:{x:ENTRANCE.x+.5,y:ENTRANCE.y+.5}};
+
+  function setStatus(txt,kind){var el=$('gpsstatus');el.textContent=txt;el.className='status'+(kind?' '+kind:'');}
+  function toMeters(p,a){return {x:(p.lon-a.lon)*111320*Math.cos(a.lat*Math.PI/180), y:(p.lat-a.lat)*110540};}
+
+  function resetToEntrance(){
+    disp={x:ENTRANCE.x+.5,y:ENTRANCE.y+.5}; goal={x:disp.x,y:disp.y};
+    state.pos={x:ENTRANCE.x,y:ENTRANCE.y}; state.queue=[]; face='up';
+    sens.pos={x:disp.x,y:disp.y};
+    render();
+  }
+  function anchorHere(){
+    if(state.mode==='gps'&&gps.last){gps.anchor={lat:gps.last.lat,lon:gps.last.lon};gps.sm=null;}
+    if(state.mode==='steps'){sens.h0=sens.heading;sens.steps=0;}
+    resetToEntrance();
+  }
+  function setMode(m){
+    if(state.mode==='gps'&&gps.watch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(gps.watch);gps.watch=null;}
+    if(state.mode==='steps'){
+      window.removeEventListener('devicemotion',onMotion);
+      window.removeEventListener('deviceorientation',onOrient);
+      window.removeEventListener('deviceorientationabsolute',onOrientAbs);
+    }
+    state.mode=m; state.queue=[]; gps.anchor=null; gps.last=null; gps.sm=null;
+    goal={x:disp.x,y:disp.y};
+    syncButtons(); renderPanels();
+  }
+  function stopMode(){setMode('demo');}
+
+  /* --- GPS --- */
+  function onFix(p){
+    var c=p.coords; gps.last={lat:c.latitude,lon:c.longitude};
+    var acc=Math.round(c.accuracy||0);
+    if(!gps.anchor){
+      var waited=(Date.now()-gps.t0)/1000;
+      if(acc<=20||(acc<=40&&waited>12)){
+        gps.anchor={lat:gps.last.lat,lon:gps.last.lon}; gps.sm=null; resetToEntrance();
+        setStatus('여기를 입구로 맞췄어요. 이제 걸어 보세요! (정확도 ±'+acc+'m)','ok');
+      } else setStatus('GPS 신호를 잡는 중… 현재 정확도 ±'+acc+'m (20m 이하가 되면 시작해요. 하늘이 트인 곳이 좋아요)','warn');
+      return;
+    }
+    if(acc>60){setStatus('GPS 신호가 약해요 (±'+acc+'m).','warn');return;}
+    var mpc=MPC[sense], m=toMeters(gps.last,gps.anchor);
+    var gx=clamp(ENTRANCE.x+.5+m.x/mpc,.5,COLS-.5), gy=clamp(ENTRANCE.y+.5-m.y/mpc,.5,ROWS-.5);
+    if(gps.sm){gx=gps.sm.x*.3+gx*.7; gy=gps.sm.y*.3+gy*.7;}
+    gps.sm={x:gx,y:gy};
+    var cell=nearestWalkable(gx,gy), tx=cell[0]+.5, ty=cell[1]+.5;
+    if(Math.hypot(tx-goal.x,ty-goal.y)>=.3) goal={x:tx,y:ty};
+    setStatus('GPS 따라가는 중 · 정확도 ±'+acc+'m'+(acc>25?' (오차가 커서 부정확할 수 있어요)':''),acc>25?'warn':'ok');
+  }
+  function onGpsErr(e){
+    if(e&&e.code===3){setStatus('GPS 신호를 기다리는 중이에요… 하늘이 트인 곳으로 가 보세요.','warn');return;}
+    var msg;
+    if(e&&e.code===1) msg='위치 권한이 허용되지 않았어요. 브라우저 설정에서 허용하거나, 미리보기 안이라면 링크를 브라우저 새 탭에서 직접 열어 주세요.';
+    else msg='위치를 가져올 수 없어요. 기기의 위치 서비스가 켜져 있는지 확인해 주세요.';
+    stopMode(); setStatus(msg,'warn');
+  }
+  function startGps(){
+    if(!navigator.geolocation){setStatus('이 브라우저는 위치 기능을 지원하지 않아요.','warn');return;}
+    setMode('gps'); gps.t0=Date.now();
+    setStatus('위치 허용을 기다리는 중…');
+    gps.watch=navigator.geolocation.watchPosition(onFix,onGpsErr,{enableHighAccuracy:true,maximumAge:0,timeout:30000});
+  }
+
+  /* --- step counter + compass (pedestrian dead reckoning) --- */
+  function compassHeading(alpha,beta,gamma){
+    var x=beta*Math.PI/180, y=gamma*Math.PI/180, z=alpha*Math.PI/180;
+    var cY=Math.cos(y), cZ=Math.cos(z), sX=Math.sin(x), sY=Math.sin(y), sZ=Math.sin(z);
+    var Vx=-cZ*sY-sZ*sX*cY, Vy=-sZ*sY+cZ*sX*cY;
+    var h=Math.atan(Vx/Vy);
+    if(Vy<0) h+=Math.PI; else if(Vx<0) h+=2*Math.PI;
+    return h*180/Math.PI;
+  }
+  function gotHeading(h){
+    sens.heading=h;
+    if(sens.h0===null){sens.h0=h; setStatus('준비 완료! 매장 안쪽을 보며 앞으로 걸어 보세요 👟','ok');}
+  }
+  function onOrient(e){
+    if(typeof e.webkitCompassHeading==='number'&&!isNaN(e.webkitCompassHeading)) gotHeading(e.webkitCompassHeading);
+    else if(e.absolute&&e.alpha!==null&&e.beta!==null&&e.gamma!==null) gotHeading(compassHeading(e.alpha,e.beta,e.gamma));
+  }
+  function onOrientAbs(e){
+    if(e.alpha!==null&&e.beta!==null&&e.gamma!==null) gotHeading(compassHeading(e.alpha,e.beta,e.gamma));
+  }
+  function onMotion(e){
+    var a=e.accelerationIncludingGravity; if(!a||a.x===null||a.x===undefined) return;
+    var mag=Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z), thr=THR[sense];
+    sens.s=sens.s*.6+mag*.4;
+    var now=Date.now();
+    if(sens.s>thr&&sens.prev<=thr&&now-sens.ls>320){sens.ls=now;onStep();}
+    sens.prev=sens.s;
+  }
+  function onStep(){
+    sens.steps++;
+    var rel=0, hd=sens.heading;
+    if(hd!==null&&sens.h0!==null) rel=(hd-sens.h0)*Math.PI/180;
+    var dx=Math.sin(rel), dy=-Math.cos(rel), p=sens.pos, nx=p.x+dx, ny=p.y+dy;
+    if(walk(Math.floor(nx),Math.floor(ny))){p.x=nx;p.y=ny;}
+    else if(walk(Math.floor(nx),Math.floor(p.y))){p.x=nx;}
+    else if(walk(Math.floor(p.x),Math.floor(ny))){p.y=ny;}
+    p.x=clamp(p.x,.5,COLS-.5); p.y=clamp(p.y,.5,ROWS-.5);
+    goal={x:p.x,y:p.y};
+    var deg=Math.round(((rel*180/Math.PI)%360+360)%360);
+    setStatus('걸음 '+sens.steps+' · 방향 '+(hd===null?'감지 안 됨(앞으로만 가요)':deg+'°'),'ok');
+  }
+  function beginSteps(){
+    setMode('steps');
+    sens.steps=0; sens.h0=null; sens.heading=null; sens.s=9.8; sens.prev=9.8;
+    resetToEntrance();
+    window.addEventListener('devicemotion',onMotion);
+    window.addEventListener('deviceorientation',onOrient);
+    window.addEventListener('deviceorientationabsolute',onOrientAbs);
+    setStatus('매장 안쪽을 바라보고 선 채로 잠깐 기다려 주세요… 방향을 잡는 중');
+    setTimeout(function(){
+      if(state.mode==='steps'&&sens.heading===null) setStatus('나침반 값을 받지 못했어요. 걸음은 세지만 방향은 앞으로만 가요.','warn');
+    },3000);
+  }
+  function startSteps(){
+    if(typeof window.DeviceMotionEvent==='undefined'){setStatus('이 브라우저는 동작 센서를 지원하지 않아요.','warn');return;}
+    var reqs=[];
+    if(typeof DeviceMotionEvent.requestPermission==='function') reqs.push(DeviceMotionEvent.requestPermission());
+    if(typeof window.DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function') reqs.push(DeviceOrientationEvent.requestPermission());
+    Promise.all(reqs).then(function(r){
+      if(r.some(function(x){return x!=='granted';})){setStatus('동작·방향 센서 권한이 필요해요. 브라우저(사파리) 설정에서 허용해 주세요.','warn');return;}
+      beginSteps();
+    }).catch(function(){setStatus('센서를 쓸 수 없어요. 링크를 브라우저에서 직접(HTTPS) 열었는지 확인해 주세요.','warn');});
+  }
+
+  function syncButtons(){
+    var m=state.mode;
+    $('gpsBtn').textContent=m==='gps'?'📍 GPS 끄기':'📍 GPS로 따라가기';
+    $('gpsBtn').className='btn'+(m==='gps'?' on':'');
+    $('stepBtn').textContent=m==='steps'?'👟 걸음 끄기':'👟 걸음으로 따라가기';
+    $('stepBtn').className='btn'+(m==='steps'?' on':'');
+    $('reset').textContent=m==='demo'?'입구로 돌아가기':(m==='steps'?'여기·이 방향을 시작점으로':'여기를 입구로 맞추기');
+    $('senseBtn').style.display=m==='demo'?'none':'';
+    $('senseBtn').textContent='민감도: '+(sense==='normal'?'보통':'높음');
+    $('followBtn').textContent=state.follow?'🗺 전체 보기':'🎯 따라가기';
+    $('followBtn').className='btn'+(state.follow?' on':'');
+  }
+
+  /* ---------- animation loop ---------- */
+  var lastT=performance.now(), lastFace='', lastWalk='';
+  function frame(t){
+    var dt=Math.min(.05,(t-lastT)/1000); lastT=t;
+
+    if(state.mode==='demo'){
+      while(state.queue.length && Math.hypot(goal.x-disp.x,goal.y-disp.y)<.03){
+        var n=state.queue.shift(); goal={x:n[0]+.5,y:n[1]+.5};
+      }
+    }
+    var dx=goal.x-disp.x, dy=goal.y-disp.y, d=Math.hypot(dx,dy);
+    var speed=state.mode==='gps'?10:(state.mode==='steps'?7:5);
+    if(d>.001){
+      var step=Math.min(d,speed*dt);
+      disp.x+=dx/d*step; disp.y+=dy/d*step;
+      if(d>.04) face=Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up');
+    }
+    walking=d>.04||(state.mode==='demo'&&state.queue.length>0);
+
+    var cell=nearestWalkable(disp.x,disp.y);
+    if(cell[0]!==state.pos.x||cell[1]!==state.pos.y){state.pos={x:cell[0],y:cell[1]};render();}
+
+    // bubble when stopped at destination
+    var a=state.targets[state.active], showB=!!(a&&a.arrived&&!walking);
+    if(showB!==bubbleOn){bubbleOn=showB;$('bubble').style.display=showB?'inline':'none';}
+
+    // character
+    me.setAttribute('transform','translate('+(disp.x*C).toFixed(2)+' '+(disp.y*C+7).toFixed(2)+')');
+    if(face!==lastFace){lastFace=face;me.setAttribute('data-face',face);$('flip').setAttribute('transform',face==='left'?'scale(-1 1)':'scale(1 1)');}
+    var w=walking?'1':'0'; if(w!==lastWalk){lastWalk=w;me.setAttribute('data-walk',w);}
+
+    // camera
+    var tw=state.follow?200:VW, k=Math.min(1,dt*6);
+    camera.w+=(tw-camera.w)*k;
+    var tx=state.follow?disp.x*C:VW/2, ty=state.follow?disp.y*C:VH/2;
+    camera.x+=(tx-camera.x)*Math.min(1,dt*8); camera.y+=(ty-camera.y)*Math.min(1,dt*8);
+    var vw=camera.w, vh=vw*VH/VW;
+    var cx=clamp(camera.x,vw/2,VW-vw/2), cy=clamp(camera.y,vh/2,VH-vh/2);
+    svg.setAttribute('viewBox',(cx-vw/2).toFixed(2)+' '+(cy-vh/2).toFixed(2)+' '+vw.toFixed(2)+' '+vh.toFixed(2));
+
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- events ---------- */
+  $('q').addEventListener('input',renderResults);
+  $('results').addEventListener('click',function(e){var b=e.target.closest('[data-p]'); if(b) addTarget(b.getAttribute('data-p'));});
+  $('targets').addEventListener('click',function(e){
+    var rm=e.target.closest('[data-rm]');
+    if(rm){state.queue=[];state.targets.splice(+rm.getAttribute('data-rm'),1);state.active=Math.max(0,Math.min(state.active,state.targets.length-1));render();return;}
+    var t=e.target.closest('[data-i]'); if(t){state.active=+t.getAttribute('data-i');render();}
+  });
+  svg.addEventListener('click',function(e){
+    var ctm=svg.getScreenCTM(); if(!ctm) return;
+    var pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
+    var p=pt.matrixTransform(ctm.inverse());
+    var x=Math.floor(p.x/C), y=Math.floor(p.y/C);
+    if(!walk(x,y)) return;
+    if(state.mode!=='demo'){setStatus('센서 모드에서는 직접 걸어서 이동해요. 탭으로 움직이려면 켜져 있는 모드를 꺼 주세요.','warn');return;}
+    walkToCell(x,y);
+  });
+  $('walk').addEventListener('click',startWalk);
+  $('reset').addEventListener('click',function(){
+    if(state.mode==='demo') walkToCell(ENTRANCE.x,ENTRANCE.y);
+    else{anchorHere();setStatus(state.mode==='steps'?'지금 서 있는 곳을 입구로, 바라보는 방향을 지도 위쪽으로 맞췄어요.':'여기를 입구로 다시 맞췄어요.','ok');}
+  });
+  $('gpsBtn').addEventListener('click',function(){if(state.mode==='gps'){stopMode();setStatus('GPS를 껐어요. 지도를 탭하면 캐릭터가 걸어가요.');}else startGps();});
+  $('stepBtn').addEventListener('click',function(){if(state.mode==='steps'){stopMode();setStatus('걸음 모드를 껐어요. 지도를 탭하면 캐릭터가 걸어가요.');}else startSteps();});
+  $('senseBtn').addEventListener('click',function(){sense=(sense==='normal'?'high':'normal');syncButtons();setStatus('민감도: '+(sense==='normal'?'보통':'높음')+(state.mode==='steps'?' (걸음을 더 잘 잡아요)':' (움직임을 더 크게 반영해요)'),'ok');});
+  $('followBtn').addEventListener('click',function(){state.follow=!state.follow;syncButtons();});
+
+  /* ---------- init ---------- */
+  $('pcount').textContent=products.length;
+  var sample=products.slice(0,2).map(function(p){var s=shelfById[p.shelf];return {product:p.name,shelf:s.id,zone:s.name};});
+  var sh=shelfById.kitchen1;
+  $('datasample').textContent=JSON.stringify({products:sample,shelves:[{id:sh.id,zone:sh.name,rect:{x:sh.x,y:sh.y,w:sh.w,h:sh.h}}],entrance:ENTRANCE},null,2);
+  buildStatic(); renderResults();
+  state.targets.push({name:'스테인리스 빨대 세척솔',shelf:'kitchen1'});
+  state.follow=true; syncButtons();
+  render();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
